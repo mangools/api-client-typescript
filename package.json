@@ -1,0 +1,78 @@
+{
+  "name": "mangools-api-client",
+  "version": "0.1.0",
+  "description": "TypeScript client for the Mangools API (KWFinder, SERPChecker, SERPWatcher, LinkMiner, SiteProfiler, AI Search Watcher), generated from the live OpenAPI description.",
+  "keywords": [
+    "mangools",
+    "kwfinder",
+    "serpwatcher",
+    "serpchecker",
+    "linkminer",
+    "siteprofiler",
+    "ai-search-watcher",
+    "seo",
+    "openapi",
+    "typescript"
+  ],
+  "homepage": "https://apidocs.mangools.com",
+  "bugs": {
+    "email": "support@mangools.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mangools/api-client-typescript.git"
+  },
+  "license": "Apache-2.0",
+  "author": "Mangools <support@mangools.com> (https://mangools.com)",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "spec/openapi.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "fetch:spec": "node scripts/fetch-spec.mjs",
+    "generate": "node scripts/generate.mjs",
+    "lint:spec": "redocly lint spec/openapi.json && spectral lint spec/openapi.json --ruleset .spectral.yaml",
+    "typecheck": "tsc --noEmit",
+    "compile": "tsup",
+    "build": "npm run fetch:spec && npm run generate && npm run compile",
+    "smoke": "node scripts/smoke.mjs",
+    "check:no-any": "node scripts/check-no-any.mjs",
+    "release:decide": "node scripts/release-decision.mjs",
+    "verify": "npm run lint:spec && npm run generate && npm run typecheck && npm run compile && npm run smoke && npm pack --dry-run && npm run check:no-any",
+    "verify:live": "npm run fetch:spec && npm run verify",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "openapi-fetch": "^0.17.0"
+  },
+  "devDependencies": {
+    "@redocly/cli": "^2.6.1",
+    "@stoplight/spectral-cli": "^6.15.0",
+    "openapi-typescript": "^7.13.0",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.3"
+  }
+}

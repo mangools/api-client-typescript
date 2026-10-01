@@ -1,0 +1,115 @@
+name: Release
+
+on:
+  schedule:
+    - cron: "0 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  OASDIFF_VERSION: 1.32.1
+
+jobs:
+  build:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      release: ${{ steps.decide.outputs.release }}
+      version: ${{ steps.decide.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - run: npm ci
+
+      - name: Install oasdiff
+        run: |
+          BASE="https://github.com/oasdiff/oasdiff/releases/download/v${OASDIFF_VERSION}"
+          ARCHIVE="oasdiff_${OASDIFF_VERSION}_linux_amd64.tar.gz"
+          curl -fsSLO "$BASE/$ARCHIVE"
+          curl -fsSLO "$BASE/checksums.txt"
+          grep " $ARCHIVE\$" checksums.txt | sha256sum -c -
+          tar xzf "$ARCHIVE" oasdiff
+          echo "OASDIFF=$PWD/oasdiff" >> "$GITHUB_ENV"
+
+      - name: Decide whether the live API description needs a release
+        id: decide
+        run: node scripts/release-decision.mjs
+
+      - name: Set the version
+        if: steps.decide.outputs.release == 'true'
+        env:
+          VERSION: ${{ steps.decide.outputs.version }}
+        run: npm version "$VERSION" --no-git-tag-version
+
+      - name: Verify
+        if: steps.decide.outputs.release == 'true'
+        run: npm run verify
+
+      - name: Pack
+        if: steps.decide.outputs.release == 'true'
+        run: npm pack
+
+      - if: steps.decide.outputs.release == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release
+          path: |
+            mangools-api-client-${{ steps.decide.outputs.version }}.tgz
+            release-notes.md
+
+  publish:
+    needs: build
+    if: needs.build.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      # Trusted publishing needs npm 11.5.1 or newer.
+      - run: npm install -g npm@11.6.2
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: release
+
+      - name: Publish to npm
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+        run: npm publish "mangools-api-client-$VERSION.tgz" --access public
+
+  github-release:
+    needs: [build, publish]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release
+
+      - name: Tag the built commit and create the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          gh release create "v$VERSION" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "v$VERSION" \
+            --notes-file release-notes.md

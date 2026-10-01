@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Fetch the live API description
+        run: npm run fetch:spec
+
+      - name: Lint the API description
+        run: npm run lint:spec
+
+      - name: Generate the client
+        run: npm run generate
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run compile
+
+      - name: Load the packed tarball as ESM and as CJS
+        run: npm run smoke
+
+      - name: Pack
+        run: npm pack --dry-run
+
+      - name: Zero-any gate
+        run: npm run check:no-any
